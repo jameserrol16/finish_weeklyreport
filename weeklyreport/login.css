@@ -1,0 +1,342 @@
+* {
+  box-sizing: border-box;
+  font-family: "Segoe UI", Arial, sans-serif;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  position: relative;
+  overflow: hidden;
+  background: #0a1628;
+}
+
+/* NTC BUILDING BACKGROUND IMAGE */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  background: url("ntc-building1.jpg") no-repeat center 40%;
+  background-size: 100%;
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* DARK GRADIENT OVERLAY */
+body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  background: linear-gradient(
+    135deg,
+    rgba(0, 15, 40, 0.65) 0%,
+    rgba(0, 31, 63, 0.45) 50%,
+    rgba(10, 22, 60, 0.65) 100%
+  );
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* CENTER WRAPPER */
+.login-wrapper {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  padding: 20px;
+}
+
+/* LOGIN CARD */
+.login-box {
+  background: rgba(255, 255, 255, 0.75);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-radius: 16px;
+  width: 420px;
+  padding: 50px 40px 50px 40px;
+  box-shadow:
+    0 20px 60px rgba(0, 31, 63, 0.15),
+    0 4px 16px rgba(0, 0, 0, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  animation: fadeInUp 0.7s ease forwards;
+  transform: translateY(20px);
+  opacity: 0;
+  position: relative;
+  overflow: hidden;
+}
+
+/* BAGONG PILIPINAS WATERMARK */
+.login-box::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: url("bagong-pilipinas.png") no-repeat center;
+  background-size: 320px;
+  opacity: 0.15;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.login-box > * {
+  position: relative;
+  z-index: 1;
+}
+
+/* TOP ACCENT BAR */
+.login-box::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: linear-gradient(90deg, #001f3f, #2f80ed, #001f3f);
+  border-radius: 16px 16px 0 0;
+  z-index: 2;
+}
+
+/* HEADER */
+.login-header {
+  text-align: center;
+  margin-bottom: 24px;
+}
+
+.login-header .agency-name {
+  font-size: 11px;
+  font-weight: 600;
+  color: #666;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  margin-bottom: 8px;
+}
+
+.login-box h2 {
+  text-align: center;
+  margin: 0 0 6px 0;
+  font-size: 26px;
+  font-weight: 700;
+  color: #001f3f;
+  letter-spacing: 0.5px;
+}
+
+.login-subtitle {
+  text-align: center;
+  font-size: 13px;
+  color: #888;
+  margin-top: 6px;
+  margin-bottom: 0;
+}
+
+.login-box label {
+  display: block;
+  margin-bottom: 6px;
+  margin-top: 4px;
+  font-weight: 600;
+  font-size: 13px;
+  color: #333;
+  letter-spacing: 0.3px;
+}
+
+/* DIVIDER */
+.login-divider {
+  height: 1px;
+  background: linear-gradient(90deg, transparent, #ddd, transparent);
+  margin: 0 0 20px 0;
+}
+
+/* INPUT GROUP */
+.input-group {
+  position: relative;
+  margin-bottom: 16px;
+}
+
+/* ICON — shared for username and password */
+.input-icon {
+  position: absolute;
+  left: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #999;
+  display: flex;
+  align-items: center;
+  pointer-events: none;
+  z-index: 1;
+}
+
+/* USERNAME INPUT */
+.login-box input[type="text"],
+.login-box input[type="email"] {
+  width: 100%;
+  padding: 13px 14px 13px 42px;
+  border-radius: 8px;
+  border: 1.5px solid #dde2ec;
+  font-size: 14px;
+  background: rgba(255, 255, 255, 0.9);
+  color: #1a1a1a;
+  transition: all 0.3s;
+  outline: none;
+}
+
+/* PASSWORD WRAPPER — contains lock icon + input + eye toggle */
+.password-wrapper {
+  position: relative;
+}
+
+/* Password input: space for lock icon on left AND eye toggle on right */
+.password-wrapper input[type="password"],
+.password-wrapper input[type="text"] {
+  width: 100%;
+  padding: 13px 45px 13px 42px;
+  border-radius: 8px;
+  border: 1.5px solid #dde2ec;
+  font-size: 14px;
+  background: rgba(255, 255, 255, 0.9);
+  color: #1a1a1a;
+  transition: all 0.3s;
+  outline: none;
+}
+
+.login-box input::placeholder {
+  color: #bbb;
+}
+
+.login-box input:focus,
+.password-wrapper input:focus {
+  border-color: #2f80ed;
+  box-shadow: 0 0 0 3px rgba(47, 128, 237, 0.12);
+  background: #fff;
+}
+
+/* EYE TOGGLE — right side of password field */
+.eye-toggle {
+  position: absolute;
+  right: 13px;
+  top: 50%;
+  transform: translateY(-50%);
+  cursor: pointer;
+  color: #aaa;
+  display: flex;
+  align-items: center;
+  transition: color 0.2s;
+  z-index: 1;
+}
+
+.eye-toggle:hover {
+  color: #2f80ed;
+}
+
+/* REMEMBER ME + FORGOT PASSWORD ROW */
+.remember-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: 4px 0 20px;
+}
+
+/* Left side: checkbox + label grouped together */
+.remember-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.remember-row input[type="checkbox"] {
+  width: 15px;
+  height: 15px;
+  min-width: 15px;
+  padding: 0;
+  margin: 0;
+  border-radius: 4px;
+  border: 1.5px solid #ccd3e0;
+  accent-color: #2f80ed;
+  cursor: pointer;
+  outline: none;
+}
+
+.remember-row input[type="checkbox"]:focus {
+  box-shadow: 0 0 0 2px rgba(47, 128, 237, 0.18);
+}
+
+.remember-row label {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 500;
+  color: #555;
+  cursor: pointer;
+  letter-spacing: 0.2px;
+}
+
+/* FORGOT PASSWORD LINK */
+.forgot-password {
+  font-size: 13px;
+  font-weight: 500;
+  color: #2f80ed;
+  text-decoration: none;
+  letter-spacing: 0.2px;
+  transition: color 0.2s;
+  white-space: nowrap;
+}
+
+.forgot-password:hover {
+  color: #1a6fd4;
+  text-decoration: underline;
+}
+
+/* SUBMIT BUTTON */
+.login-box button[type="submit"] {
+  width: 100%;
+  padding: 13px;
+  background: linear-gradient(135deg, #001f3f 0%, #2f80ed 100%);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s;
+  letter-spacing: 0.5px;
+  margin-top: 4px;
+  box-shadow: 0 4px 15px rgba(47, 128, 237, 0.3);
+}
+
+.login-box button[type="submit"]:hover {
+  background: linear-gradient(135deg, #002d5a 0%, #1a6fd4 100%);
+  box-shadow: 0 6px 20px rgba(47, 128, 237, 0.4);
+  transform: translateY(-1px);
+}
+
+.login-box button[type="submit"]:active {
+  transform: translateY(0);
+}
+
+/* ERROR */
+.error {
+  background: rgba(255, 107, 107, 0.1);
+  border: 1px solid rgba(255, 107, 107, 0.3);
+  border-radius: 8px;
+  color: #d63031;
+  text-align: center;
+  padding: 10px;
+  margin-bottom: 18px;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+/* FOOTER */
+.login-footer {
+  text-align: center;
+  margin-top: 16px;
+  font-size: 11px;
+  color: #aaa;
+  letter-spacing: 0.3px;
+}
+
+/* ANIMATION */
+@keyframes fadeInUp {
+  0%   { opacity: 0; transform: translateY(20px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
