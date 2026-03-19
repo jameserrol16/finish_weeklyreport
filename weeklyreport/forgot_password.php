@@ -61,6 +61,81 @@ if (isset($_POST['username'])) {
 <title>Forgot Password | NTC</title>
 <link rel="stylesheet" href="login.css?v=<?= time() ?>">
 <style>
+    /* NTC HEADER */
+    .ntc-header {
+      position: fixed;
+      top: 0; left: 0; right: 0;
+      z-index: 100;
+      background: #1a3fa3;
+      padding: 10px 28px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .ntc-header-left {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+    .ntc-header-left img {
+      width: 62px;
+      height: 62px;
+      object-fit: contain;
+      flex-shrink: 0;
+    }
+    .ntc-header-titles {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      border-left: 1.5px solid rgba(255,255,255,0.4);
+      padding-left: 14px;
+    }
+    .ntc-header-titles .republic {
+      font-size: 12px;
+      font-weight: 600;
+      color: #fff;
+      letter-spacing: 0.3px;
+      margin-bottom: 2px;
+      padding-bottom: 4px;
+      border-bottom: 1px solid rgba(255,255,255,0.35);
+    }
+    .ntc-header-titles .agency {
+      font-size: 22px;
+      font-weight: 700;
+      color: #fff;
+      line-height: 1.15;
+      letter-spacing: 0.2px;
+    }
+    .ntc-header-right {
+      text-align: right;
+      flex-shrink: 0;
+    }
+    .ntc-header-right .pst-label {
+      font-size: 11px;
+      color: rgba(255,255,255,0.75);
+      margin-bottom: 1px;
+    }
+    .ntc-header-right .clock {
+      font-size: 13px;
+      font-weight: 500;
+      color: #fff;
+      letter-spacing: 0.3px;
+    }
+    /* NTC FOOTER */
+    .ntc-footer {
+      position: fixed;
+      bottom: 0; left: 0; right: 0;
+      z-index: 100;
+      background: #1a3fa3;
+      padding: 10px 28px;
+      text-align: center;
+    }
+    .ntc-footer p {
+      font-size: 11px;
+      color: rgba(255,255,255,0.7);
+      margin: 0;
+    }
+
 .back-link {
   display: block;
   text-align: center;
@@ -87,6 +162,21 @@ if (isset($_POST['username'])) {
 </style>
 </head>
 <body>
+
+<!-- NTC HEADER -->
+<header class="ntc-header">
+  <div class="ntc-header-left">
+    <img src="ntc-logo.png" alt="NTC Logo" />
+    <div class="ntc-header-titles">
+      <div class="republic">Republic of the Philippines</div>
+      <div class="agency">National Telecommunications Commission</div>
+    </div>
+  </div>
+  <div class="ntc-header-right">
+    <div class="pst-label">Philippine Standard Time:</div>
+    <div class="clock" id="ntc-clock"></div>
+  </div>
+</header>
 
 <div class="login-wrapper">
   <div class="login-box">
@@ -195,7 +285,34 @@ if (isset($_POST['username'])) {
   </div>
 </div>
 
+<!-- NTC FOOTER -->
+<footer class="ntc-footer">
+  <p>&copy; <?= date('Y') ?> National Telecommunications Commission &nbsp;&middot;&nbsp; All Rights Reserved</p>
+</footer>
+
 <script>
+// Live Philippine Standard Time clock
+function updateClock() {
+  const now = new Date();
+  const options = {
+    timeZone: 'Asia/Manila',
+    weekday: 'long',
+    year: 'numeric',
+    month: 'long',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: true
+  };
+  const parts = new Intl.DateTimeFormat('en-PH', options).formatToParts(now);
+  const get = type => parts.find(p => p.type === type)?.value ?? '';
+  document.getElementById('ntc-clock').textContent =
+    `${get('weekday')}, ${get('month')} ${get('day')}, ${get('year')}, ${get('hour')}:${get('minute')}:${get('second')} ${get('dayPeriod')}`;
+}
+updateClock();
+setInterval(updateClock, 1000);
+
 function togglePass(inputId, openId, closedId) {
   const input = document.getElementById(inputId);
   const open  = document.getElementById(openId);

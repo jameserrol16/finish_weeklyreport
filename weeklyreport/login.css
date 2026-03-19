@@ -8,10 +8,12 @@ body {
   min-height: 100vh;
   display: flex;
   justify-content: center;
-  align-items: center;
+  align-items: flex-start;
   position: relative;
   overflow: hidden;
   background: #0a1628;
+  padding-top: 110px;
+  padding-bottom: 80px;
 }
 
 /* NTC BUILDING BACKGROUND IMAGE */
@@ -47,7 +49,8 @@ body::after {
   width: 100%;
   display: flex;
   justify-content: center;
-  padding: 20px;
+  min-height: calc(100vh - 110px - 80px); /* fill remaining space */
+  align-items: center; /* center the card within the remaining space */
 }
 
 /* LOGIN CARD */

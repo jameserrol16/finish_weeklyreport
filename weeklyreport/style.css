@@ -450,15 +450,71 @@ th:hover .col-controls {
   transform-origin: top left;
 }
 /* PRINT */
+/* ══════════════════════════════
+   PERFECT PRINT SCALING
+══════════════════════════════ */
 @media print {
-  body { background: #fff; }
-  .login-box,
+
+  /* Reset layout */
+  body {
+    margin: 0;
+    padding: 0;
+    background: #fff !important;
+  }
+
+  .main {
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  /* Hide UI elements */
   .top-right,
   .col-controls,
-  .table-actions {
-    display: none;
+  .table-actions,
+  .sig-icon-btn,
+  .sig-delete,
+  .sig-resizer {
+    display: none !important;
   }
-  .page { border: none; }
+
+  /* FORCE A4 SIZE */
+  html, body {
+    width: 210mm;
+    height: 297mm;
+  }
+
+  /* MAIN PAGE */
+  .page {
+    width: 100% !important;
+    max-width: 210mm;
+    min-height: 297mm;
+    margin: 0 auto;
+    padding: 10mm;
+    border: none !important;
+    box-shadow: none !important;
+    border-radius: 0 !important;
+  }
+
+  /* Prevent breaking rows */
+  table, tr, td {
+    page-break-inside: avoid !important;
+  }
+
+  /* Allow content to expand */
+  textarea {
+    height: auto !important;
+    overflow: visible !important;
+  }
+
+  /* Images scale correctly */
+  img {
+    max-width: 100%;
+    height: auto;
+  }
+}
+@page {
+  size: auto;   /* supports A4 or Letter */
+  margin: 10mm;
 }
 /* ================================= */
 /* FORCE REPORT TO STAY WHITE IN DARK MODE */

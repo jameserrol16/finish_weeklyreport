@@ -33,50 +33,21 @@ include "header.php";
   .main { margin-left: 250px; padding: 30px; transition: margin-left 0.3s ease; box-sizing: border-box; }
   .main.collapsed { margin-left: 70px; }
 
-  .page {
-    width: 900px !important;
-    max-width: 100% !important;
-    margin: 0 auto !important;
-    background: #fff !important;
-    padding: 25px !important;
-    border: 1px solid #000 !important;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.15) !important;
-    border-radius: 4px !important;
-    position: relative !important;
-    font-family: Arial, Helvetica, sans-serif !important;
-    font-size: 12px !important;
-  }
-  .page .letterhead {
-    display: flex !important;
-    flex-direction: row !important;
-    align-items: center !important;
-    justify-content: center !important;
-    gap: 14px !important;
-    margin-bottom: 10px !important;
-  }
-  .page .letterhead img { width: 65px !important; height: auto !important; }
-  .page .letterhead-text { text-align: center !important; font-size: 12px !important; line-height: 1.4 !important; max-width: 520px !important; }
-  .page h1 { text-align: center !important; font-size: 18px !important; font-weight: bold !important; }
-  .page table { width: 100% !important; border-collapse: collapse !important; font-size: 12px !important; }
-  .page th, .page td { border: 1px solid #000 !important; padding: 4px !important; vertical-align: top !important; }
+  /* Make all inputs/textareas readonly-looking without breaking layout */
   .page input, .page textarea {
-    width: 100% !important;
-    box-sizing: border-box !important;
-    font-size: 12px !important;
-    font-family: inherit !important;
-    padding: 4px 6px !important;
-    border: none !important;
-    background: transparent !important;
-    resize: none !important;
     pointer-events: none !important;
     cursor: default !important;
+    background: #f9f9f9 !important;
+    border-color: #ddd !important;
   }
-  .page input::placeholder, .page textarea::placeholder { color: transparent !important; }
-
+/* Hide all placeholders in admin view */
+.page input::placeholder,
+.page textarea::placeholder {
+    color: transparent !important;
+}
   @media print {
     .sidebar, .header { display: none !important; }
     .main { margin-left: 0 !important; padding: 0 !important; }
-    .page { box-shadow: none !important; border: none !important; }
   }
 </style>
 
@@ -174,7 +145,6 @@ include "header.php";
 </script>
 
 <?php include "footer.php"; ?>
-<script src="script1.js?v=2"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     if (!window.isAdminView) return;
@@ -186,27 +156,59 @@ document.addEventListener('DOMContentLoaded', function() {
         window.savedAccomplishments.forEach(row => {
             const tr = document.createElement("tr");
 
+            // Column 1: Day + Mode (matches JO addRow() structure)
             const dayTd = document.createElement("td");
             dayTd.style.textAlign = "center";
-            dayTd.style.fontSize = "12px";
-            dayTd.innerHTML = `${row.day || ''}<br>${row.mode || ''}`;
+
+          const dateInput = document.createElement("input");
+dateInput.type = "text";  // plain text — no browser date UI
+dateInput.style.width = "100%";
+dateInput.style.textAlign = "center";
+dateInput.value = row.day || '';
+dateInput.readOnly = true;
+
+            const modeInput = document.createElement("input");
+            modeInput.type = "text";
+            modeInput.className = "work-mode";
+            modeInput.placeholder = "On-site / WFH";
+            modeInput.style.textAlign = "center";
+            modeInput.style.width = "100%";
+            modeInput.value = row.mode || '';
+            modeInput.readOnly = true;
+
+            dayTd.appendChild(dateInput);
+            dayTd.appendChild(modeInput);
             tr.appendChild(dayTd);
 
+            // Column 2: Accomplishment
             const accTd = document.createElement("td");
-            accTd.textContent = row.accomplishment || '';
+            const accTextarea = document.createElement("textarea");
+            accTextarea.value = row.accomplishment || '';
+            accTextarea.readOnly = true;
+            accTd.appendChild(accTextarea);
             tr.appendChild(accTd);
 
+            // Column 3: Description
             const descTd = document.createElement("td");
-            descTd.textContent = row.description || '';
+            const descTextarea = document.createElement("textarea");
+            descTextarea.value = row.description || '';
+            descTextarea.readOnly = true;
+            descTd.appendChild(descTextarea);
             tr.appendChild(descTd);
 
             tbody.appendChild(tr);
+
+            // Auto-expand textareas to match content height
+            [accTextarea, descTextarea].forEach(t => {
+                t.style.height = 'auto';
+                t.style.height = t.scrollHeight + 'px';
+            });
         });
     }
 
-    // Hide empty sig-text inputs
+    // Show sig-text inputs (don't hide them — admin is just viewing)
     document.querySelectorAll('.sig-text').forEach(el => {
-        if (!el.value || !el.value.trim()) el.style.display = 'none';
+        el.style.display = 'block';
     });
 });
 </script>

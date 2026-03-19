@@ -3,21 +3,25 @@ session_name('jo_session');
 session_start();
 require "db.php";
 
-// Must be logged in
 if (!isset($_SESSION['user_id'])) {
     header("Location: login.php");
     exit;
 }
 
-$userId = $_SESSION['user_id'];
-$isAdmin = isset($_SESSION['role']) && $_SESSION['role'] === 'admin';
+$userId   = $_SESSION['user_id'];
+$isAdmin  = isset($_SESSION['role']) && $_SESSION['role'] === 'admin';
 $reportId = isset($_GET['id']) ? intval($_GET['id']) : 0;
 $readonly = $isAdmin || (isset($_GET['readonly']) && $_GET['readonly'] == 1);
 
-$editingReport = null;
+// Fetch logged-in user's profile for autofill
+$stmtUser = $conn->prepare("SELECT full_name, position, branch, division FROM users WHERE id = ?");
+$stmtUser->bind_param("i", $userId);
+$stmtUser->execute();
+$sessionUser = $stmtUser->get_result()->fetch_assoc() ?? [];
+
+$editingReport  = null;
 $editingContent = [];
 
-// Only fetch report if an ID was provided
 if ($reportId > 0) {
     if ($isAdmin) {
         $stmt = $conn->prepare("SELECT * FROM weekly_reports WHERE id = ?");
@@ -37,20 +41,21 @@ if ($reportId > 0) {
     $editingContent = json_decode($editingReport['content'], true) ?? [];
 }
 
-// Handle POST save
 if (
     $_SERVER['REQUEST_METHOD'] === 'POST' &&
     isset($_POST['action']) &&
     $_POST['action'] === 'save_report'
 ) {
-    $reportId    = $_POST['id'] ?? '';
-    $reportName  = trim($_POST['report_name'] ?? 'Untitled Report');
-    $weekRange   = trim($_POST['week_range'] ?? '');
-    $employee    = trim($_POST['employee'] ?? '');
-    $division    = trim($_POST['division'] ?? '');
-    $position    = trim($_POST['position'] ?? '');
-    $branch      = trim($_POST['branch'] ?? '');
-    $workTask    = trim($_POST['work_task'] ?? '');
+    $reportId        = $_POST['id'] ?? '';
+    $reportName      = trim($_POST['report_name'] ?? 'Untitled Report');
+    $weekRange       = trim($_POST['week_range'] ?? '');
+    $rangeStart      = trim($_POST['range_start'] ?? '');
+    $rangeEnd        = trim($_POST['range_end'] ?? '');
+    $employee        = trim($_POST['employee'] ?? '');
+    $division        = trim($_POST['division'] ?? '');
+    $position        = trim($_POST['position'] ?? '');
+    $branch          = trim($_POST['branch'] ?? '');
+    $workTask        = trim($_POST['work_task'] ?? '');
     $accomplishments = json_decode($_POST['accomplishments'] ?? '[]', true);
 
     $contentJson = json_encode([
@@ -59,7 +64,11 @@ if (
         'position'        => $position,
         'branch'          => $branch,
         'work_task'       => $workTask,
-        'accomplishments' => $accomplishments
+        'accomplishments' => $accomplishments,
+        'range_start'     => $rangeStart,
+        'range_end'       => $rangeEnd,
+        'sig_texts'       => json_decode($_POST['sig_texts'] ?? '[]', true),
+        'sig_images'      => json_decode($_POST['sig_images'] ?? '[]', true),
     ]);
 
     if (!empty($reportId)) {
@@ -88,191 +97,431 @@ if (
 <head>
 <meta charset="UTF-8">
 <title>Weekly Accomplishment Report</title>
-<link rel="stylesheet" href="/weeklyreport/style.css?v=<?= filemtime('style.css') ?>">
-<script src="https://cdn.jsdelivr.net/npm/signature_pad@4.1.0/dist/signature_pad.umd.min.js"></script>
+<link rel="stylesheet" href="/weeklyreport/style.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 </head>
+
 <style>
   .main { margin-left: 250px; padding: 30px; transition: margin-left 0.3s ease; }
   .main.collapsed { margin-left: 70px; }
   body { margin: 0; padding: 0; }
   .page { margin: 0 auto; }
+
+  /* Hide native date picker icon in preview mode */
+  .preview-mode input[type="date"]::-webkit-calendar-picker-indicator { display: none !important; }
+  .preview-mode input[type="date"] { -webkit-appearance: none; appearance: none; }
+
+  /* ── Signature Icon Button ── */
+  .sig-icon-btn {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
+    width: 72px;
+    height: 72px;
+    margin: 6px auto;
+    border: 2px dashed #bbb;
+    border-radius: 10px;
+    background: #fafafa;
+    cursor: pointer;
+    color: #555;
+    font-size: 11px;
+    transition: border-color .2s, background .2s, color .2s;
+    user-select: none;
+  }
+  .sig-icon-btn:hover {
+    border-color: #333;
+    background: #f0f0f0;
+    color: #111;
+  }
+  .sig-icon-btn .sig-icon-svg {
+    font-size: 22px;
+    line-height: 1;
+  }
+  .sig-icon-btn[disabled] {
+    opacity: 0.4;
+    pointer-events: none;
+  }
+
+  /* ── Signature Modal ── */
+  .sig-modal-overlay {
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,.45);
+    z-index: 2000;
+  }
+  .sig-modal-box {
+    position: fixed;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    background: #fff;
+    border-radius: 10px;
+    box-shadow: 0 8px 40px rgba(0,0,0,.28);
+    width: 460px;
+    max-width: 96vw;
+    z-index: 2001;
+    font-family: Arial, sans-serif;
+    overflow: hidden;
+  }
+  .sig-modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 18px;
+    border-bottom: 1px solid #e0e0e0;
+    font-weight: bold;
+    font-size: 14px;
+  }
+  .sig-modal-close {
+    background: none; border: none;
+    font-size: 20px; cursor: pointer;
+    line-height: 1; color: #555;
+  }
+  .sig-modal-close:hover { color: #000; }
+
+  .sig-modal-tabs {
+    display: flex;
+    border-bottom: 1px solid #e0e0e0;
+  }
+  .sig-tab {
+    flex: 1;
+    padding: 10px;
+    border: none;
+    background: #f8f8f8;
+    cursor: pointer;
+    font-size: 12px;
+    border-bottom: 3px solid transparent;
+    transition: background .15s;
+  }
+  .sig-tab:hover { background: #efefef; }
+  .sig-tab.active {
+    background: #fff;
+    border-bottom-color: #000;
+    font-weight: bold;
+  }
+
+  .sig-tab-content { display: none; padding: 16px 18px 0; }
+  .sig-tab-content.active { display: block; }
+
+  .sig-tab-hint {
+    font-size: 11px; color: #777;
+    margin: 0 0 10px;
+  }
+
+  /* Type tab */
+  #sigTypeInput {
+    width: 100%; box-sizing: border-box;
+    font-size: 13px; padding: 7px 10px;
+    border: 1px solid #ccc; border-radius: 4px;
+    margin-bottom: 10px;
+  }
+  .sig-font-options {
+    display: flex; flex-wrap: wrap; gap: 6px;
+    margin-bottom: 10px;
+  }
+  .sig-font-opt {
+    border: 2px solid #ddd;
+    border-radius: 6px;
+    padding: 5px 10px;
+    font-size: 20px;
+    cursor: pointer;
+    background: #fafafa;
+    transition: border-color .15s;
+    white-space: nowrap;
+  }
+  .sig-font-opt:hover  { border-color: #888; }
+  .sig-font-opt.selected { border-color: #000; background: #f0f0f0; }
+
+  #sigTypeCanvas {
+    display: block;
+    width: 100%; height: 80px;
+    border: 1px solid #e0e0e0;
+    border-radius: 4px;
+    background: #fff;
+  }
+
+  /* Draw tab */
+  .sig-canvas-wrap {
+    border: 1px solid #ccc; border-radius: 4px;
+    background: #fff; overflow: hidden;
+  }
+  #sigDrawCanvas {
+    display: block;
+    width: 100%; height: 130px;
+    cursor: crosshair;
+    touch-action: none;
+  }
+
+  /* Upload tab */
+  .sig-upload-drop {
+    border: 2px dashed #bbb;
+    border-radius: 8px;
+    padding: 28px 20px;
+    text-align: center;
+    color: #888; font-size: 13px;
+    cursor: pointer;
+    transition: border-color .15s, background .15s;
+    position: relative;
+  }
+  .sig-upload-drop:hover, .sig-upload-drop.drag-over {
+    border-color: #333; background: #f5f5f5; color: #333;
+  }
+  .sig-upload-drop input[type="file"] {
+    position: absolute; inset: 0;
+    opacity: 0; cursor: pointer;
+    width: 100%; height: 100%;
+  }
+  #sigUploadCanvas {
+    width: 100%; border: 1px solid #e0e0e0;
+    border-radius: 4px; background: #fff;
+  }
+
+  /* Color row */
+  .sig-color-row {
+    display: flex; align-items: center; gap: 8px;
+    margin-top: 8px; font-size: 12px;
+  }
+  .sig-color-row input[type="color"] {
+    width: 32px; height: 28px;
+    border: 1px solid #ccc; border-radius: 4px;
+    padding: 2px; cursor: pointer;
+  }
+  .sig-clear-btn {
+    margin-left: auto;
+    border: 1px solid #ccc;
+    background: #fff; padding: 4px 10px;
+    font-size: 11px; cursor: pointer;
+    border-radius: 4px;
+  }
+  .sig-clear-btn:hover { background: #f0f0f0; }
+
+  /* Footer */
+  .sig-modal-footer {
+    display: flex; justify-content: flex-end;
+    gap: 8px; padding: 14px 18px;
+    border-top: 1px solid #e0e0e0;
+    margin-top: 14px;
+  }
+  .sig-cancel-btn {
+    border: 1px solid #ccc; background: #fff;
+    padding: 7px 16px; font-size: 12px;
+    cursor: pointer; border-radius: 4px;
+  }
+  .sig-cancel-btn:hover { background: #f0f0f0; }
+  .sig-apply-btn {
+    border: none; background: #111; color: #fff;
+    padding: 7px 18px; font-size: 12px;
+    cursor: pointer; border-radius: 4px;
+  }
+  .sig-apply-btn:hover { background: #333; }
 </style>
+
 <body>
-    <?php include "jo_header.php"; ?>
+  <?php include "jo_header.php"; ?>
+
+<div id="main" class="main">
 <div class="page" id="reportPage">
   <form id="reportForm" method="POST" onsubmit="return validateReportForm()">
-<input type="hidden" name="report_name" 
-       value="<?= htmlspecialchars($editingReport['report_name'] ?? '') ?>">
-    <!-- Hidden input for editing -->
+    <input type="hidden" name="report_name"
+           value="<?= htmlspecialchars($editingReport['report_name'] ?? '') ?>">
     <input type="hidden" name="id" value="<?= $editingReport['id'] ?? '' ?>">
 
     <!-- REPORT NAME MODAL -->
     <div id="modalOverlay" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:1000;"></div>
+    <div id="reportNamePrompt" style="display:none; position:fixed; top:50%; left:50%; transform:translate(-50%, -50%); background:white; padding:20px; z-index:1001;">
+        <h3>Enter Report Name</h3>
+        <input type="text" id="newReportName" placeholder="Report Name">
+        <button type="button" onclick="confirmReportName()">Save</button>
+    </div>
 
-<div id="reportNamePrompt" style="display:none; position:fixed; top:50%; left:50%; transform:translate(-50%, -50%); background:white; padding:20px; z-index:1001;">
-    <h3>Enter Report Name</h3>
-    <input type="text" id="newReportName" placeholder="Report Name">
-    <button type="button" onclick="confirmReportName()">Save</button>
-</div>
     <!-- TOP BUTTONS -->
     <div class="top-right">
-<?php if (!$readonly): ?>
-  <button type="button" onclick="saveReport(event)">💾 Save</button>
-  <button type="button" onclick="togglePreview()" id="previewBtn">👁 Preview</button>
-<?php endif; ?>
-  <button type="button" onclick="exportPDF()">📄 Export to PDF</button>
-</div>
-
-
-  <!-- LETTERHEAD -->
-  <div class="letterhead">
-    <img src="ntc-logo.png">
-    <div class="letterhead-text">
-      <strong>REPUBLIC OF THE PHILIPPINES</strong><br>
-      <strong>NATIONAL TELECOMMUNICATIONS COMMISSION</strong><br>
-      NTC Building, Sen. Miriam P. Defensor-Santiago Avenue<br>
-      Brgy. Pinyahan, Diliman, Quezon City 1100<br>
-      Email: ntc@ntc.gov.ph | https://www.ntc.gov.ph
+      <?php if (!$readonly): ?>
+        <button type="button" onclick="saveReport(event)">💾 Save</button>
+        <button type="button" onclick="togglePreview()" id="previewBtn">👁 Preview</button>
+      <?php endif; ?>
+      <button type="button" onclick="exportPDF()">📄 Export to PDF</button>
     </div>
-    <img src="bagong-pilipinas.jfif">
-  </div>
 
-  <hr>
+    <!-- LETTERHEAD -->
+    <div class="letterhead">
+      <img src="ntc-logo.png">
+      <div class="letterhead-text">
+        <strong>REPUBLIC OF THE PHILIPPINES</strong><br>
+        <strong>NATIONAL TELECOMMUNICATIONS COMMISSION</strong><br>
+        NTC Building, Sen. Miriam P. Defensor-Santiago Avenue<br>
+        Brgy. Pinyahan, Diliman, Quezon City 1100<br>
+        Email: ntc@ntc.gov.ph | https://www.ntc.gov.ph
+      </div>
+      <img src="bagong-pilipinas.jfif">
+    </div>
 
-  <h1>WEEKLY ACCOMPLISHMENT REPORT</h1>
-  <div class="date-range">
-  <input name="week_range" placeholder="Date Range" style="text-align:center;"
-       value="<?= htmlspecialchars($editingReport['week_range'] ?? '') ?>">
-</div>
-<br><br>
+    <hr>
 
-  <table>
-    <tr>
-  <td class="label">Employee :</td>
-  <td><input name="employee" value="<?= htmlspecialchars($editingContent['employee'] ?? '') ?>" <?= $readonly ? 'readonly' : '' ?>></td>
- <td class="label">Division :</td>
-  <td><input name="division" value="<?= htmlspecialchars($editingContent['division'] ?? '') ?>" <?= $readonly ? 'readonly' : '' ?>></td>
-</tr>
-<tr>
-  <td class="label">Position :</td>
-  <td><input name="position" value="<?= htmlspecialchars($editingContent['position'] ?? '') ?>" <?= $readonly ? 'readonly' : '' ?>></td>
- <td class="label">Branch :</td>
-  <td><input name="branch" value="<?= htmlspecialchars($editingContent['branch'] ?? '') ?>" <?= $readonly ? 'readonly' : '' ?>></td>
-</tr>
-  </table>
+    <h1>WEEKLY ACCOMPLISHMENT REPORT</h1>
 
-  <br>
+    <!-- DATE RANGE — date pickers with From <= To validation -->
+    <div class="date-range" style="text-align:center; margin-bottom:4px;">
+      <div id="datePickerRow" style="display:flex; align-items:center; justify-content:center; gap:8px; font-size:12px; padding:4px 0;">
+        <label style="font-weight:bold;">From:</label>
+        <input type="date" id="rangeStart" name="range_start"
+               style="width:140px; text-align:center;"
+               value="<?= htmlspecialchars($editingContent['range_start'] ?? '') ?>"
+               <?= $readonly ? 'readonly' : '' ?>>
+        <label style="font-weight:bold;">To:</label>
+        <input type="date" id="rangeEnd" name="range_end"
+               style="width:140px; text-align:center;"
+               value="<?= htmlspecialchars($editingContent['range_end'] ?? '') ?>"
+               <?= $readonly ? 'readonly' : '' ?>>
+      </div>
+      <div id="dateRangeError"
+           style="display:none; color:#dc3545; font-size:11px; margin-top:3px;">
+        ⚠ "From" date cannot be later than "To" date.
+      </div>
+      <!-- Shown in preview & PDF -->
+      <div id="weekRangeDisplay"
+           style="display:none; font-size:12px; text-align:center; padding:4px 0;">
+        <?= htmlspecialchars($editingReport['week_range'] ?? '') ?>
+      </div>
+      <input type="hidden" name="week_range" id="weekRangeHidden"
+             value="<?= htmlspecialchars($editingReport['week_range'] ?? '') ?>">
+    </div>
+    <br>
 
-  <table>
-    <tr><td class="label">Work Task:</td></tr>
-    <tr><td><textarea name="work_task" <?= $readonly ? 'readonly' : '' ?>><?= htmlspecialchars($editingContent['work_task'] ?? '') ?></textarea></td></tr>
-  </table>
-
-  <br>
-
-  <!-- ACCOMPLISHMENT TABLE -->
-  <table id="accomplishmentTable">
-    <thead>
-      <tr id="headerRow">
-        <th>Day (Onsite/WFH)
-           <?php if (!$readonly): ?>
-  <div class="col-controls">
-    <div class="control-btn" onclick="addColumn(this)">+</div>
-    <div class="control-btn" onclick="removeColumn(this)">−</div>
-  </div>
-  <?php endif; ?>
-        </th>
-        <th>Accomplishment
-           <?php if (!$readonly): ?>
-  <div class="col-controls">
-    <div class="control-btn" onclick="addColumn(this)">+</div>
-    <div class="control-btn" onclick="removeColumn(this)">−</div>
-  </div>
-  <?php endif; ?>
-        </th>
-        <th>Description
-           <?php if (!$readonly): ?>
-  <div class="col-controls">
-    <div class="control-btn" onclick="addColumn(this)">+</div>
-    <div class="control-btn" onclick="removeColumn(this)">−</div>
-  </div>
-  <?php endif; ?>
-        </th>
+    <?php
+    // For new reports, autofill from session user. For existing reports, use saved content.
+    $autoEmployee = $editingReport
+        ? ($editingContent['employee'] ?? '')
+        : ($sessionUser['full_name'] ?? '');
+    $autoDivision = $editingReport
+        ? ($editingContent['division'] ?? '')
+        : ($sessionUser['division'] ?? '');
+    $autoPosition = $editingReport
+        ? ($editingContent['position'] ?? '')
+        : ($sessionUser['position'] ?? '');
+    $autoBranch   = $editingReport
+        ? ($editingContent['branch'] ?? '')
+        : ($sessionUser['branch'] ?? '');
+    ?>
+    <table>
+      <tr>
+        <td class="label">Employee :</td>
+        <td><input name="employee" value="<?= htmlspecialchars($autoEmployee) ?>" readonly style="background:#f5f5f5; cursor:not-allowed;"></td>
+        <td class="label">Division :</td>
+        <td><input name="division" value="<?= htmlspecialchars($autoDivision) ?>" readonly style="background:#f5f5f5; cursor:not-allowed;"></td>
       </tr>
-    </thead>
-    <tbody></tbody>
-  </table>
+      <tr>
+        <td class="label">Position :</td>
+        <td><input name="position" value="<?= htmlspecialchars($autoPosition) ?>" readonly style="background:#f5f5f5; cursor:not-allowed;"></td>
+        <td class="label">Branch :</td>
+        <td><input name="branch" value="<?= htmlspecialchars($autoBranch) ?>" readonly style="background:#f5f5f5; cursor:not-allowed;"></td>
+      </tr>
+    </table>
 
-<div class="table-actions">
-<?php if (!$readonly): ?>
-  <button type="button" onclick="addRow()">➕ Add Row</button>
-  <button type="button" onclick="removeLastRow()">➖ Remove Last Row</button>
-<?php endif; ?>
-</div>
+    <br>
 
+    <table>
+      <tr><td class="label">Work Task:</td></tr>
+      <tr><td><textarea name="work_task" <?= $readonly ? 'readonly' : '' ?>><?= htmlspecialchars($editingContent['work_task'] ?? '') ?></textarea></td></tr>
+    </table>
 
-  <br>
+    <br>
 
-  <!-- SIGNATURES -->
-  <table class="signature-table">
-    <tr>
-      <td class="center signature">
-  <strong>Submitted by:</strong><br><br>
+    <!-- ACCOMPLISHMENT TABLE -->
+    <table id="accomplishmentTable">
+      <thead>
+        <tr id="headerRow">
+          <th>Day (Onsite/WFH)
+            <?php if (!$readonly): ?>
+            <div class="col-controls">
+              <div class="control-btn" onclick="addColumn(this)">+</div>
+              <div class="control-btn" onclick="removeColumn(this)">−</div>
+            </div>
+            <?php endif; ?>
+          </th>
+          <th>Accomplishment
+            <?php if (!$readonly): ?>
+            <div class="col-controls">
+              <div class="control-btn" onclick="addColumn(this)">+</div>
+              <div class="control-btn" onclick="removeColumn(this)">−</div>
+            </div>
+            <?php endif; ?>
+          </th>
+          <th>Description
+            <?php if (!$readonly): ?>
+            <div class="col-controls">
+              <div class="control-btn" onclick="addColumn(this)">+</div>
+              <div class="control-btn" onclick="removeColumn(this)">−</div>
+            </div>
+            <?php endif; ?>
+          </th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
 
-  <div class="sig-container" style="position: relative; min-height: 90px; overflow: visible;">
-    <input type="file" accept="image/*" class="signature-upload" onchange="loadSignature(this)" <?= $readonly ? 'disabled' : '' ?>>
-    <div class="sig-box" style="display:none;">
-      <span class="sig-delete">✖</span>
-      <img class="signature-img">
-      <div class="sig-resizer"></div>
+    <div class="table-actions">
+      <?php if (!$readonly): ?>
+        <button type="button" onclick="addRow()">➕ Add Row</button>
+        <button type="button" onclick="removeLastRow()">➖ Remove Last Row</button>
+      <?php endif; ?>
     </div>
-  </div>
 
-  <input class="sig-text" placeholder="Name" <?= $readonly ? 'readonly' : '' ?>>
-  <input class="sig-text" placeholder="Position" <?= $readonly ? 'readonly' : '' ?>>
-</td>
-      <td class="center signature">
-  <strong>Verified and Validated by:</strong><br><br>
+    <br>
 
-  <div class="sig-container" style="position: relative; min-height: 90px; overflow: visible;">
-    <input type="file" accept="image/*" class="signature-upload" onchange="loadSignature(this)">
-    <div class="sig-box" style="display:none;">
-      <span class="sig-delete">✖</span>
-      <img class="signature-img">
-      <div class="sig-resizer"></div>
-    </div>
-  </div>
+    <!-- SIGNATURES — "Submitted by" auto-filled from session -->
+    <table class="signature-table">
+      <tr>
+        <?php
+        $sigLabels = ['Submitted by:', 'Verified and Validated by:', 'Approved by:'];
+        foreach ($sigLabels as $idx => $label): ?>
+        <td class="center signature">
+          <strong><?= $label ?></strong><br><br>
+          <div class="sig-container" style="position: relative; min-height: 90px; overflow: visible;">
 
-  <input class="sig-text" placeholder="Name">
-  <input class="sig-text" placeholder="Position">
-</td>
-      <td class="center signature">
-  <strong>Approved by:</strong><br><br>
+            <?php if (!$readonly): ?>
+            <button type="button"
+                    class="sig-icon-btn"
+                    onclick="openSignatureModal(this)"
+                    title="Add Signature">
+              <span class="sig-icon-svg">✍️</span>
+              <span>Sign here</span>
+            </button>
+            <?php endif; ?>
 
-  <div class="sig-container" style="position: relative; min-height: 90px; overflow: visible;">
-    <input type="file" accept="image/*" class="signature-upload" onchange="loadSignature(this)">
-    <div class="sig-box" style="display:none;">
-      <span class="sig-delete">✖</span>
-      <img class="signature-img">
-      <div class="sig-resizer"></div>
-    </div>
-  </div>
+            <div class="sig-box" style="display:none;">
+              <span class="sig-delete">✖</span>
+              <img class="signature-img">
+              <div class="sig-resizer"></div>
+            </div>
+          </div>
+          <!-- Auto-fill name & position for "Submitted by" (index 0) only -->
+          <input class="sig-text" placeholder="Name"
+                 value="<?= $idx === 0 ? htmlspecialchars($sessionUser['full_name'] ?? '') : '' ?>"
+                 <?= $readonly ? 'readonly' : '' ?>>
+          <input class="sig-text" placeholder="Position"
+                 value="<?= $idx === 0 ? htmlspecialchars($sessionUser['position'] ?? '') : '' ?>"
+                 <?= $readonly ? 'readonly' : '' ?>>
+        </td>
+        <?php endforeach; ?>
+      </tr>
+    </table>
 
-  <input class="sig-text" placeholder="Name">
-  <input class="sig-text" placeholder="Position">
-</td>
-    </tr>
-  </table>
+  </form>
 
-</div>
-</form>
-<script>
-    // Tell JS whether this is an existing report
-    window.editingReportId = <?= $editingReport ? $editingReport['id'] : 'null' ?>;
-</script>
-<script src="script1.js?v=4"></script>
+  <script>
+    window.editingReportId      = <?= $editingReport ? $editingReport['id'] : 'null' ?>;
+    window.savedAccomplishments = <?= json_encode($editingContent['accomplishments'] ?? []) ?>;
+    window.savedSigTexts        = <?= json_encode($editingContent['sig_texts']       ?? []) ?>;
+    window.savedSigImages       = <?= json_encode($editingContent['sig_images']      ?? []) ?>;
+    const reportPage = document.getElementById('reportPage');
+    const previewBtn = document.getElementById('previewBtn');
+  </script>
+</div><!-- /.page -->
+</div><!-- /.main -->
+
+<script src="script1.js?v=6"></script>
 <?php include "jo_footer.php"; ?>
 
 </body>

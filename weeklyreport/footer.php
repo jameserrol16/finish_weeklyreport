@@ -1,27 +1,19 @@
 <script>
-// Immediately check sidebar state before page paint
-(function() {
-    const sidebarCollapsed = localStorage.getItem("sidebarCollapsed");
-    if (sidebarCollapsed === "true") {
-        document.body.classList.add("sidebar-collapsed"); // add a body class to apply collapsed styles
-    }
-})();
-
+// Sidebar toggle
 function toggleSidebar() {
     const sidebar = document.getElementById("sidebar");
-    const header = document.getElementById("header");
-    const main = document.getElementById("main");
+    const header  = document.getElementById("header");
+    const main    = document.getElementById("main");
 
     sidebar.classList.toggle("collapsed");
     header.classList.toggle("collapsed");
     main.classList.toggle("collapsed");
 
-    // Save state to localStorage
     const isCollapsed = sidebar.classList.contains("collapsed");
     localStorage.setItem("sidebarCollapsed", isCollapsed ? "true" : "false");
 }
 
-// Loader
+// Loader + restore sidebar state on load
 window.addEventListener("load", function() {
     const loader = document.getElementById("loader");
     if (loader) {
@@ -29,16 +21,14 @@ window.addEventListener("load", function() {
         setTimeout(() => loader.style.display = "none", 500);
     }
 
-    const sidebarCollapsed = localStorage.getItem("sidebarCollapsed");
-
-    if (sidebarCollapsed === "true") {
+    if (localStorage.getItem("sidebarCollapsed") === "true") {
         const sidebar = document.getElementById("sidebar");
-        const header = document.getElementById("header");
-        const main = document.getElementById("main");
+        const header  = document.getElementById("header");
+        const main    = document.getElementById("main");
 
         if (sidebar) sidebar.classList.add("collapsed");
-        if (header) header.classList.add("collapsed");
-        if (main) main.classList.add("collapsed");
+        if (header)  header.classList.add("collapsed");
+        if (main)    main.classList.add("collapsed");
     }
 });
 
@@ -47,7 +37,7 @@ const darkToggle = document.getElementById("darkToggle");
 
 if (localStorage.getItem("darkMode") === "enabled") {
     document.body.classList.add("dark");
-    darkToggle.innerHTML = "☀️";
+    darkToggle.innerHTML = "☀️ Light Mode";
 }
 
 darkToggle.addEventListener("click", function() {
@@ -55,23 +45,25 @@ darkToggle.addEventListener("click", function() {
 
     if (document.body.classList.contains("dark")) {
         localStorage.setItem("darkMode", "enabled");
-        darkToggle.innerHTML = "☀️";
+        darkToggle.innerHTML = "☀️ Light Mode";
     } else {
         localStorage.setItem("darkMode", "disabled");
-        darkToggle.innerHTML = "🌙";
+        darkToggle.innerHTML = "🌙 Dark Mode";
     }
 });
 </script>
+
 <script>
-const uploadBtn = document.getElementById('uploadBtn');
-const fileInput = document.getElementById('profileUploadInput');
+// Profile Picture Upload
+const uploadBtn  = document.getElementById('uploadBtn');
+const fileInput  = document.getElementById('profileUploadInput');
 const profileImg = document.getElementById('sidebarProfileImg');
 
 uploadBtn.addEventListener('click', () => {
-    fileInput.click(); // trigger file input
+    fileInput.click();
 });
 
-fileInput.addEventListener('change', function(){
+fileInput.addEventListener('change', function() {
     const file = this.files[0];
     if (!file) return;
 
@@ -85,8 +77,7 @@ fileInput.addEventListener('change', function(){
     })
     .then(res => res.json())
     .then(data => {
-        if(data.status === "success"){
-            // Update sidebar image instantly
+        if (data.status === "success") {
             profileImg.src = "uploads/" + data.profile_picture + "?" + new Date().getTime();
         } else {
             alert(data.message);

@@ -49,8 +49,8 @@ include "header.php";
                             <td><?= htmlspecialchars($row['full_name']) ?></td>
                             <td><?= htmlspecialchars($row['report_name']) ?></td>
                             <td><?= htmlspecialchars($row['week_range']) ?></td>
-                            <td><?= date("M d, Y H:i", strtotime($row['created_at'])) ?></td>
-                            <td><?= date("M d, Y H:i", strtotime($row['updated_at'])) ?></td>
+                            <td><?= date("M d, Y h:i A", strtotime($row['created_at'])) ?></td>
+							<td><?= date("M d, Y h:i A", strtotime($row['updated_at'])) ?></td>
                             <td>
                                <a class="action-btn view" href="admin_viewreport.php?id=<?= $row['id'] ?>">👁 View</a>
                             </td>
